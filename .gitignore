@@ -1,0 +1,27 @@
+# Ignore virtual environments
+.venv/
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore data folder and outputs
+data/
+signature_counts.csv
+
+# Ignore Python bytecode files
+__pycache__/
+*.py[cod]
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore environment configuration files
+.env
+*.env
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+
+# Ignore Mac system files
+.DS_Store
