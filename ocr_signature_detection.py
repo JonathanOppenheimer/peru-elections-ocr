@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pdf2image
 import pytesseract
+import re
 
 from skimage.metrics import structural_similarity as ssim
 from time_extraction import get_ocr_results
@@ -242,17 +243,19 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name):
 
     return signature_count
 
-def extract_table_number(pdf_image, pdf_file_name):
+def extract_table_number(pdf_image, pdf_file_path):
     """
     Extract the table number from the PDF image.
-    If OCR fails, use the PDF file name (without extension).
-
+    Fallbacks:
+        1. If OCR fails or the number is longer than 6 digits, use the PDF file name if it's a 6-digit number.
+        2. If the above fails, use '999999'.
+    
     Parameters:
         pdf_image (PIL.Image.Image): The image of the PDF page.
-        pdf_file_name (str): The name or path of the PDF file.
-
+        pdf_file_path (str): The full file path of the PDF file.
+    
     Returns:
-        str: The extracted table number.
+        str: The extracted table number or fallback value.
     """
     img_width, img_height = pdf_image.size
 
@@ -263,19 +266,39 @@ def extract_table_number(pdf_image, pdf_file_name):
     right = coordinates["right"]
     bottom = coordinates["bottom"]
 
+    # Crop the image to the bounding box
     cropped_image = pdf_image.crop((left, top, right, bottom))
     cropped_image_np = np.array(cropped_image)
+
+    # Convert to grayscale
     gray = cv2.cvtColor(cropped_image_np, cv2.COLOR_RGB2GRAY)
+
+    # Apply binary inverse thresholding
     _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+
+    # Configure pytesseract to recognize digits only
     custom_config = r'--oem 3 --psm 6 digits'
+
+    # Perform OCR
     text = pytesseract.image_to_string(thresh, config=custom_config)
-    number = ''.join(filter(str.isdigit, text))
+    
+    # Extract digits from the OCR result
+    ocr_number = ''.join(filter(str.isdigit, text)).strip()
 
-    if not number:
-        # If OCR failed to extract a number, use the PDF file name without extension
-        number = os.path.splitext(os.path.basename(pdf_file_name))[0]
+    # Check if OCR extracted a valid number (6 digits or fewer)
+    if ocr_number and len(ocr_number) <= 6:
+        return ocr_number
 
-    return number
+    # If OCR number is longer than 6 digits or empty, attempt to use the file name
+    base_name = os.path.basename(pdf_file_path)          # e.g., '324.pdf' from '/path/to/324.pdf'
+    file_name_without_ext = os.path.splitext(base_name)[0]  # e.g., '324'
+
+    # Use regex to check if the file name is exactly six digits
+    if re.fullmatch(r'\d{6}', file_name_without_ext):
+        return file_name_without_ext
+
+    # If both OCR and file name methods fail, return '999999'
+    return '999999'
 
 def extract_time_and_date(pdf_image, box_name):
     """
