@@ -1,6 +1,6 @@
 # OCR Signature Detection Project
 
-This project focuses on detecting and counting handwritten signatures from specific areas on standardized political science PDF documents. The PDFs contain multiple signature boxes on different pages, and the project applies various image processing techniques to accurately detect these signatures.
+This project focuses on detecting and counting handwritten signatures from specific areas on standardized Peru ONPE election records. The PDFs contain multiple signature boxes on different pages, and the project applies various image processing techniques to accurately detect these signatures.
 
 ## Table of Contents
 - [Installation](#installation)
