@@ -6,6 +6,7 @@ import os
 import pdf2image
 import pytesseract
 import re
+import pandas as pd
 
 from skimage.metrics import structural_similarity as ssim
 from time_extraction import get_ocr_results
@@ -357,21 +358,6 @@ def get_all_features(pdf_path, empty_template_paths):
 
     return table_number, numobs1_count, numobs2_count, numobs3_count#, open_time, close_time
 
-def append_result_to_csv(row, csv_path):
-    """
-    Save the result to CSV file row by row.
-
-    Parameters:
-        row (list): The data row to append.
-        csv_path (str): The path to the CSV file.
-    """
-    file_exists = os.path.isfile(csv_path)
-    with open(csv_path, mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        if not file_exists:
-            writer.writerow(["acta_number", "numobs1", "numobs2", "numobs3"]) #, "open_time", "close_time"])
-        writer.writerow(row)
-
 def process_folder(input_folder, empty_template_paths, csv_output_path):
     """
     Process all PDFs in the input folder and save the results to a CSV file.
@@ -381,30 +367,84 @@ def process_folder(input_folder, empty_template_paths, csv_output_path):
         empty_template_paths (dict): Dictionary mapping box names to template image paths.
         csv_output_path (str): Path to the output CSV file.
     """
+    batch_results = []
+    batch_size = 10
+    processed_files = 0
+
+    # Check if CSV file exists, if so, remove it to start fresh
+    if os.path.isfile(csv_output_path):
+        os.remove(csv_output_path)
+
     # Iterate over all PDF files in the input folder
-    for filename in os.listdir(input_folder):
-        if filename.endswith(".pdf"):
-            pdf_path = os.path.join(input_folder, filename)
-            print(f"Processing {filename}...")
-            try:
-                # Analyze the signature boxes
-                table_number, numobs1, numobs2, numobs3 = get_all_features(pdf_path, empty_template_paths)
+    pdf_files = [f for f in os.listdir(input_folder) if f.endswith('.pdf')]
+    total_files = len(pdf_files)
 
-                # Save the results to CSV
-                append_result_to_csv([table_number, numobs1, numobs2, numobs3], csv_output_path)
-            except Exception as e:
-                print(f"Error processing {filename}: {e}")
+    for filename in pdf_files:
+        pdf_path = os.path.join(input_folder, filename)
+        print(f"Processing {filename} ({processed_files + 1}/{total_files})...")
+        try:
+            # Analyze the signature boxes
+            table_number, numobs1, numobs2, numobs3 = get_all_features(pdf_path, empty_template_paths)
 
-    print(f"All PDFs processed. Results saved to {csv_output_path}")
+            # Append the result to the batch_results list
+            batch_results.append([table_number, numobs1, numobs2, numobs3])
+            processed_files += 1
+
+            # When batch_size is reached, write the batch to CSV
+            if len(batch_results) == batch_size:
+                # Convert batch_results to DataFrame
+                df_batch = pd.DataFrame(batch_results, columns=["acta_number", "numobs1", "numobs2", "numobs3"])
+
+                # Append to CSV
+                if not os.path.isfile(csv_output_path):
+                    df_batch.to_csv(csv_output_path, index=False, mode='w', header=True)
+                else:
+                    df_batch.to_csv(csv_output_path, index=False, mode='a', header=False)
+
+                print(f"Saved batch of {batch_size} records to {csv_output_path}")
+
+                # Clear batch_results
+                batch_results = []
+
+        except Exception as e:
+            print(f"Error processing {filename}: {e}")
+
+    # After processing all files, write any remaining results to CSV
+    if len(batch_results) > 0:
+        # Convert batch_results to DataFrame
+        df_batch = pd.DataFrame(batch_results, columns=["acta_number", "numobs1", "numobs2", "numobs3"])
+
+        # Append to CSV
+        if not os.path.isfile(csv_output_path):
+            df_batch.to_csv(csv_output_path, index=False, mode='w', header=True)
+        else:
+            df_batch.to_csv(csv_output_path, index=False, mode='a', header=False)
+
+        print(f"Saved final batch of {len(batch_results)} records to {csv_output_path}")
+
+    # After all processing, read the entire CSV file, sort it, and overwrite it
+    df = pd.read_csv(csv_output_path)
+    df.sort_values(by="acta_number", inplace=True)
+    df.to_csv(csv_output_path, index=False)
+
+    print(f"All PDFs processed. Final results saved to {csv_output_path}")
 
 if __name__ == "__main__":
-    input_folder = '/Users/oppenheimerj/Desktop/Senior Year/Semester 1/POL429/Acta Images/'  # Folder containing multiple PDFs
+    data_directory = './data'  # Directory containing input folders
     empty_template_paths = {
         "numobs1": './templates/empty_numobs1.png',
         "numobs2": './templates/empty_numobs2.png',
         "numobs3": './templates/empty_numobs3.png'
     }
-    csv_output_path = './signature_counts.csv'
 
-    # Process all PDFs in the input folder and write results to the CSV
-    process_folder(input_folder, empty_template_paths, csv_output_path)
+    # List all subdirectories in the data directory
+    input_folders = [os.path.join(data_directory, name) for name in os.listdir(data_directory)
+                     if os.path.isdir(os.path.join(data_directory, name))]
+
+    # Process each input folder
+    for input_folder in input_folders:
+        input_folder_name = os.path.basename(input_folder)
+        csv_output_path = f'./{input_folder_name}.csv'
+        print(f"Processing input folder: {input_folder}")
+        # Process all PDFs in the input folder and write results to the CSV
+        process_folder(input_folder, empty_template_paths, csv_output_path)
