@@ -105,7 +105,8 @@ For signature detection, we use the **SSIM** algorithm to compare each signature
 ├── data/                        # Input PDFs and output CSV files
 │   └── example.pdf              # Example PDF for testing
 ├── templates/                   # Empty signature box templates
-│   └── empty_numobs1.png        # Example template for numobs1
+│   └── r1/                      # Sample templates 
+│       └── empty_numobs1_r1.png 
 ├── ocr_signature_detection.py   # Main Python script for signature detection
 ├── README.md                    # Project README
 ├── requirements.txt             # Project dependencies

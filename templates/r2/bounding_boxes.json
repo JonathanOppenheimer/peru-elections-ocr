@@ -1,0 +1,38 @@
+{
+    "mesa_sufragio": {
+        "left_pct": 0.05,
+        "top_pct": 0.12,
+        "right_pct": 0.19,
+        "bottom_pct": 0.165
+    },
+    "numobs1": {
+        "left_pct": 0.03,
+        "top_pct": 0.886,
+        "right_pct": 0.73,
+        "bottom_pct": 0.98,
+        "grid": {
+            "rows": 1,
+            "columns": 2
+        }
+    },
+    "numobs2": {
+        "left_pct": 0.79,
+        "top_pct": 0.19,
+        "right_pct": 0.94,
+        "bottom_pct": 0.49,
+        "grid": {
+            "rows": 2,
+            "columns": 1
+        }
+    },
+    "numobs3": {
+        "left_pct": 0.79,
+        "top_pct": 0.657,
+        "right_pct": 0.94,
+        "bottom_pct": 0.955,
+        "grid": {
+            "rows": 2,
+            "columns": 1
+        }
+    }
+}

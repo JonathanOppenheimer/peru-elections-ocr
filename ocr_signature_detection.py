@@ -1,4 +1,4 @@
-import csv
+import json
 import cv2
 import locale
 import numpy as np
@@ -17,63 +17,9 @@ try:
 except locale.Error:
     print("Spanish locale 'es_ES' not installed. Using default locale.")
 
-# Define the bounding boxes for different signature areas
-bounding_boxes = {
-    "mesa_sufragio": {
-        "left_pct": 0.05,
-        "top_pct": 0.12,
-        "right_pct": 0.19,
-        "bottom_pct": 0.165
-    },
-    "numobs1": {
-        "left_pct": 0.84,
-        "top_pct": 0.205,
-        "right_pct": 0.97,
-        "bottom_pct": 0.98
-    },
-    "numobs2": {
-        "left_pct": 0.717,
-        "top_pct": 0.045,
-        "right_pct": 0.965,
-        "bottom_pct": 0.495
-    },
-    "numobs3": {
-        "left_pct": 0.717,
-        "top_pct": 0.505,
-        "right_pct": 0.965,
-        "bottom_pct": 0.955
-    },
-    "open_time": {
-        "left_pct": 0.05,
-        "top_pct": 0.225,
-        "right_pct": 0.8,
-        "bottom_pct": 0.255,
-        "roi": {
-            "x": 0.124,
-            "y": 0.13,
-            "w": 0.212,
-            "h": 0.82
-        }
-    },
-    "close_time": {
-        "left_pct": 0.05,
-        "top_pct": 0.86,
-        "right_pct": 0.75,
-        "bottom_pct": 0.89,
-        "roi": {
-            "x": 0.124,
-            "y": 0.13,
-            "w": 0.212,
-            "h": 0.82
-        }
-    }
-}
-
-signature_box_splits = {
-    "numobs1": (10, 1),  # 10 rows, 1 column
-    "numobs2": (5, 2),   # 5 rows, 2 columns
-    "numobs3": (5, 2)
-}
+# Load bounding box configurations from JSON file - change this to the correct file for the round
+with open('templates/r2/bounding_boxes.json', 'r') as f:   
+    bounding_boxes = json.load(f)
 
 def get_bounding_box_coordinates(bbox_name, img_width, img_height):
     """
@@ -203,20 +149,23 @@ def template_match_signature_area(cropped_image_np, empty_template, threshold=0.
     score, _ = ssim(processed_image, resized_template, full=True)
     return score < threshold
 
-def analyze_single_signature_box(pdf_image, empty_template_path, box_name):
+def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug=False):
     """
     Analyze a signature box area and count the number of signed boxes.
-
+    
     Parameters:
         pdf_image (PIL.Image.Image): The image of the PDF page.
         empty_template_path (str): Path to the empty template image.
         box_name (str): The name of the bounding box area to analyze.
+        debug (bool): If True, saves debug images showing the bounding box.
 
     Returns:
         int: The number of signed boxes in the area.
     """
     # Load the empty template image from the path
     empty_template = cv2.imread(empty_template_path, cv2.IMREAD_GRAYSCALE)
+    if empty_template is None:
+        raise FileNotFoundError(f"Could not load template image from {empty_template_path}")
 
     img_width, img_height = pdf_image.size
 
@@ -227,15 +176,34 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name):
     right = coordinates["right"]
     bottom = coordinates["bottom"]
 
+    if debug:
+        # Convert PIL Image to numpy array for OpenCV
+        full_image_np = np.array(pdf_image)
+        debug_image = full_image_np.copy()
+        
+        # Draw rectangle around the bounding box
+        cv2.rectangle(debug_image, (left, top), (right, bottom), (0, 255, 0), 2)
+        
+        # Save debug image
+        os.makedirs('debug', exist_ok=True)
+        cv2.imwrite(f'debug/{box_name}_full_page.png', cv2.cvtColor(debug_image, cv2.COLOR_RGB2BGR))
+        
+        # Save cropped region
+        cropped_image = pdf_image.crop((left, top, right, bottom))
+        cropped_np = np.array(cropped_image)
+        cv2.imwrite(f'debug/{box_name}_cropped.png', cv2.cvtColor(cropped_np, cv2.COLOR_RGB2BGR))
+
     cropped_image = pdf_image.crop((left, top, right, bottom))
     cropped_image_np = np.array(cropped_image)
 
-    # Determine the number of rows and columns for splitting
-    rows, cols = signature_box_splits.get(box_name, (10, 1))
+    # Get grid configuration from bounding boxes
+    grid_config = bounding_boxes[box_name]["grid"]
+    rows = grid_config["rows"]
+    cols = grid_config["columns"]
 
     # Split the image into grids
     signature_boxes = split_image_into_grid(cropped_image_np, rows, cols)
-
+    
     # Perform signature analysis
     signature_count = 0
     for box in signature_boxes:
@@ -347,7 +315,7 @@ def get_all_features(pdf_path, empty_template_paths):
 
     # Analyze numobs1 (on page 1)
     numobs1_count = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1")
-
+    print(numobs1_count)
     # Analyze numobs2 and numobs3 (on page 2)
     numobs2_count = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2")
     numobs3_count = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3")
@@ -358,83 +326,89 @@ def get_all_features(pdf_path, empty_template_paths):
 
     return table_number, numobs1_count, numobs2_count, numobs3_count#, open_time, close_time
 
-def process_folder(input_folder, empty_template_paths, csv_output_path):
+def process_folder(input_folder, empty_template_paths, csv_output_path, debug=False, first_pdf_only=False):
     """
-    Process all PDFs in the input folder and save the results to a CSV file.
-
+    Process PDFs in the input folder and save the results to a CSV file.
+    
     Parameters:
         input_folder (str): Path to the folder containing PDF files.
         empty_template_paths (dict): Dictionary mapping box names to template image paths.
         csv_output_path (str): Path to the output CSV file.
+        debug (bool): If True, saves debug images showing the bounding boxes.
+        first_pdf_only (bool): If True, only processes the first PDF file.
     """
     batch_results = []
-    batch_size = 10
     processed_files = 0
-
+   
     # Check if CSV file exists, if so, remove it to start fresh
     if os.path.isfile(csv_output_path):
         os.remove(csv_output_path)
-
-    # Iterate over all PDF files in the input folder
+    else: # Create output directory if it doesn't exist
+        os.makedirs(os.path.dirname(csv_output_path), exist_ok=True)
+    
+    # Get list of PDF files
     pdf_files = [f for f in os.listdir(input_folder) if f.endswith('.pdf')]
+    if first_pdf_only and pdf_files:
+        pdf_files = [pdf_files[0]]
+    
     total_files = len(pdf_files)
+
+    # Define column names consistently
+    columns = ["acta_number", "numobs1", "numobs2", "numobs3"]
 
     for filename in pdf_files:
         pdf_path = os.path.join(input_folder, filename)
         print(f"Processing {filename} ({processed_files + 1}/{total_files})...")
         try:
-            # Analyze the signature boxes
-            table_number, numobs1, numobs2, numobs3 = get_all_features(pdf_path, empty_template_paths)
+            # Convert PDF to images
+            pdf_images = pdf2image.convert_from_path(pdf_path, dpi=300, poppler_path="/opt/homebrew/Cellar/poppler/25.01.0/bin")
+            
+            # Extract table number
+            table_number = extract_table_number(pdf_images[0], pdf_path)
+            
+            # Analyze signature boxes with debug flag
+            numobs1 = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1", debug)
+            numobs2 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2", debug)
+            numobs3 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3", debug)
 
             # Append the result to the batch_results list
             batch_results.append([table_number, numobs1, numobs2, numobs3])
             processed_files += 1
 
-            # When batch_size is reached, write the batch to CSV
-            if len(batch_results) == batch_size:
-                # Convert batch_results to DataFrame
-                df_batch = pd.DataFrame(batch_results, columns=["acta_number", "numobs1", "numobs2", "numobs3"])
-
-                # Append to CSV
-                if not os.path.isfile(csv_output_path):
-                    df_batch.to_csv(csv_output_path, index=False, mode='w', header=True)
-                else:
-                    df_batch.to_csv(csv_output_path, index=False, mode='a', header=False)
-
-                print(f"Saved batch of {batch_size} records to {csv_output_path}")
-
-                # Clear batch_results
-                batch_results = []
+            print(batch_results)
+            
+            # Write results immediately
+            df_batch = pd.DataFrame(batch_results, columns=columns)
+            mode = 'w' if processed_files == 1 else 'a'
+            header = processed_files == 1
+            df_batch.to_csv(csv_output_path, index=False, mode=mode, header=header)
+            batch_results = []
 
         except Exception as e:
             print(f"Error processing {filename}: {e}")
+            continue
 
-    # After processing all files, write any remaining results to CSV
-    if len(batch_results) > 0:
-        # Convert batch_results to DataFrame
-        df_batch = pd.DataFrame(batch_results, columns=["acta_number", "numobs1", "numobs2", "numobs3"])
+    # Only try to sort if we have processed files successfully
+    if os.path.exists(csv_output_path) and os.path.getsize(csv_output_path) > 0:
+        df = pd.read_csv(csv_output_path)
+        df.sort_values(by="acta_number", inplace=True)
+        df.to_csv(csv_output_path, index=False)
 
-        # Append to CSV
-        if not os.path.isfile(csv_output_path):
-            df_batch.to_csv(csv_output_path, index=False, mode='w', header=True)
-        else:
-            df_batch.to_csv(csv_output_path, index=False, mode='a', header=False)
-
-        print(f"Saved final batch of {len(batch_results)} records to {csv_output_path}")
-
-    # After all processing, read the entire CSV file, sort it, and overwrite it
-    df = pd.read_csv(csv_output_path)
-    df.sort_values(by="acta_number", inplace=True)
-    df.to_csv(csv_output_path, index=False)
-
-    print(f"All PDFs processed. Final results saved to {csv_output_path}")
+    print(f"All PDFs processed. Results saved to {csv_output_path}")
 
 if __name__ == "__main__":
     data_directory = './data'  # Directory containing input folders
-    empty_template_paths = {
-        "numobs1": './templates/empty_numobs1.png',
-        "numobs2": './templates/empty_numobs2.png',
-        "numobs3": './templates/empty_numobs3.png'
+    
+    empty_template_paths_r1 = {
+        "numobs1": './templates/r1/empty_numobs1.png',
+        "numobs2": './templates/r1/empty_numobs2.png',
+        "numobs3": './templates/r1/empty_numobs3.png'
+    }
+    
+    empty_template_paths_r2 = {
+        "numobs1": './templates/r2/empty_numobs1.png',
+        "numobs2": './templates/r2/empty_numobs2.png',
+        "numobs3": './templates/r2/empty_numobs3.png'
     }
 
     # List all subdirectories in the data directory
@@ -444,7 +418,7 @@ if __name__ == "__main__":
     # Process each input folder
     for input_folder in input_folders:
         input_folder_name = os.path.basename(input_folder)
-        csv_output_path = f'./{input_folder_name}.csv'
+        csv_output_path = f'./output/csv/{input_folder_name}.csv'
         print(f"Processing input folder: {input_folder}")
-        # Process all PDFs in the input folder and write results to the CSV
-        process_folder(input_folder, empty_template_paths, csv_output_path)
+        # Process with debug=True and first_pdf_only=True
+        process_folder(input_folder, empty_template_paths_r2, csv_output_path, debug=True, first_pdf_only=True)

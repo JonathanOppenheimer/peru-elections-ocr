@@ -6,6 +6,8 @@
 
 # Ignore data folder and outputs
 data/
+debug/
+output/
 signature_counts.csv
 
 # Ignore Python bytecode files
@@ -18,6 +20,7 @@ __pycache__/
 # Ignore environment configuration files
 .env
 *.env
+secret.json
 
 # Ignore logs and temporary files
 *.log
