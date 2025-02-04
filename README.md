@@ -62,8 +62,9 @@ Install the package in development mode:
 pip install -e .
 ```
 
-### 4. Install Tesseract OCR
-This project requires Tesseract for optical character recognition (OCR). Install Tesseract as follows:
+### 4. Install Required System Dependencies
+
+#### Install Tesseract OCR:
 
 - **macOS**: 
   ```bash
@@ -77,6 +78,25 @@ This project requires Tesseract for optical character recognition (OCR). Install
 
 - **Windows**:
   Download and install Tesseract from [here](https://github.com/tesseract-ocr/tesseract/wiki).
+
+#### Install Poppler:
+
+Poppler is required for PDF processing. Install it as follows:
+
+- **macOS**:
+  ```bash
+  brew install poppler
+  ```
+
+- **Ubuntu/Debian**:
+  ```bash
+  sudo apt-get install poppler-utils
+  ```
+
+- **Windows**:
+  1. Download the latest binary from [here](http://blog.alivate.com.au/poppler-windows/)
+  2. Extract to a folder (e.g., `C:\Program Files\poppler-xx\`)
+  3. Add the bin folder to your system PATH
 
 ### 5. Verify Installation
 To verify that everything is installed correctly, try running the example script:
@@ -124,23 +144,6 @@ For signature detection, we use the **SSIM** algorithm to compare each signature
 
 ---
 
-## File Structure
-
-```
-.
-├── data/                        # Input PDFs and output CSV files
-│   └── example.pdf              # Example PDF for testing
-├── templates/                   # Empty signature box templates
-│   └── r1/                      # Sample templates 
-│       └── empty_numobs1_r1.png 
-├── ocr_signature_detection.py   # Main Python script for signature detection
-├── README.md                    # Project README
-├── requirements.txt             # Project dependencies
-└── signature_counts.csv         # Output CSV file with signature counts
-```
-
----
-
 ## Contributing
 
 Contributions are welcome! If you have suggestions or find issues, feel free to open a pull request or issue on the repository.
@@ -149,7 +152,7 @@ Contributions are welcome! If you have suggestions or find issues, feel free to 
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
