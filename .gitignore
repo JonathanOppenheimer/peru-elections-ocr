@@ -1,8 +1,38 @@
-# Ignore virtual environments
-.venv/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Ignore VSCode settings
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
 .vscode/
+
+# Project specific
+config/secret.json
+*.log
 
 # Ignore data folder and outputs
 data/
@@ -10,17 +40,12 @@ debug/
 output/
 signature_counts.csv
 
-# Ignore Python bytecode files
-__pycache__/
-*.py[cod]
-
 # Ignore Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
 # Ignore environment configuration files
 .env
 *.env
-secret.json
 
 # Ignore logs and temporary files
 *.log

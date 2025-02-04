@@ -12,6 +12,32 @@ This project focuses on detecting and counting handwritten signatures from speci
 
 ---
 
+## Project Structure
+
+```
+.
+├── src/                         # Source code
+│   ├── ocr/                    # OCR-related modules
+│   │   ├── __init__.py
+│   │   ├── template_generation.py
+│   │   └── ocr_signature_detection.py
+│   └── utils/                  # Utility modules
+│       ├── __init__.py
+│       └── dropbox_downloader.py
+├── config/                     # Configuration files
+│   └── secret.json            # API keys and credentials
+├── data/                      # Input PDFs and output CSV files
+│   ├── downloaded_pdfs/       # Downloaded PDF files
+│   └── output/                # Processing results
+├── templates/                 # Empty signature box templates
+│   └── r2/
+│       └── bounding_boxes.json
+├── main.py                    # Main entry point
+├── setup.py                   # Package installation
+├── requirements.txt           # Project dependencies
+└── README.md                 # Project documentation
+```
+
 ## Installation
 
 To set up this project locally, follow these steps:
@@ -24,16 +50,16 @@ cd your-repo-url
 ```
 
 ### 2. Set Up a Virtual Environment (Optional but recommended)
-Create a virtual environment to isolate the project’s dependencies:
+Create a virtual environment to isolate the project's dependencies:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows, use .venv\Scripts\activate
 ```
 
-### 3. Install Dependencies
-Install the required Python packages:
+### 3. Install Package
+Install the package in development mode:
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 4. Install Tesseract OCR
@@ -62,21 +88,21 @@ python ocr_signature_detection.py
 
 ## Usage
 
-This project processes two-page PDF documents, detects signatures in predefined signature boxes on each page, and saves the signature count to a CSV file. Here's how to run the program:
+To run the program:
 
-1. Place your input PDFs in the `./data/` directory.
-2. Run the signature detection script with:
+1. Add your Dropbox credentials to `config/secret.json`
+2. Run the main script:
    ```bash
-   python ocr_signature_detection.py
+   python main.py
    ```
 
-3. The results, including the table number and the count of signatures from the different boxes (`numobs1`, `numobs2`, `numobs3`), will be saved to a CSV file in the `./data/` directory.
+3. The results, including the table number and the count of signatures from the different boxes (`numobs1`, `numobs2`, `numobs3`), will be saved to a CSV file in the `./data/output/` directory.
 
 ### Directory Structure
 The key directories used by this project are:
-- `./data/` - For input PDFs and output CSV files.
-- `./templates/` - For storing empty signature box templates.
-- `./debug/` - (Optional, used during debugging to save intermediate images).
+- `./data/downloaded_pdfs/` - For storing downloaded PDFs.
+- `./data/output/` - For storing processed results.
+- `./templates/r2/` - For storing bounding box templates.
 
 ---
 
@@ -90,7 +116,7 @@ Images are converted from RGB to grayscale. This helps simplify the image and re
 ### 2. **Median Blurring**
 We apply a **median blur** to the image, which is particularly useful for reducing noise (like ink spots or specks of dust). This type of blur helps remove salt-and-pepper noise while preserving the edges of the content (like handwritten signatures).
 
-### 3. **Otsu’s Thresholding**
+### 3. **Otsu's Thresholding**
 Otsu's method is an automatic thresholding technique that determines the optimal threshold value to convert the grayscale image into a binary image (black and white). This is critical for differentiating between the background and the actual signatures.
 
 ### 4. **Structural Similarity Index (SSIM)**

@@ -3,6 +3,7 @@ import json
 import numpy as np
 from PIL import Image
 import pdf2image
+import os
 
 def preprocess_image_for_consistent_background(image_np):
     """
@@ -123,13 +124,17 @@ def generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir="./templ
             print(f"Error generating template for {box_name}: {str(e)}")
 
 if __name__ == "__main__":
+    # Update configuration paths to use project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    
     # Configuration paths
-    empty_pdf_path = "./data/testing/000001.pdf"
-    bounding_boxes_path = "templates/r2/bounding_boxes.json"
+    empty_pdf_path = os.path.join(project_root, "data", "testing", "000001.pdf")
+    bounding_boxes_path = os.path.join(project_root, "templates", "r2", "bounding_boxes.json")
+    output_dir = os.path.join(project_root, "templates", "r2")
     
     # Load bounding box configurations
     with open(bounding_boxes_path, 'r') as f:
         bounding_boxes = json.load(f)
     
     # Generate all templates
-    generate_empty_templates(empty_pdf_path, bounding_boxes)
+    generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir)

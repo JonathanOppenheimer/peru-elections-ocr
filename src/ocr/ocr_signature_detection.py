@@ -9,7 +9,7 @@ import re
 import pandas as pd
 
 from skimage.metrics import structural_similarity as ssim
-from time_extraction import get_ocr_results
+from src.ocr.time_extraction import get_ocr_results
 
 # Set the locale to Spanish for proper date parsing
 try:
@@ -17,8 +17,12 @@ try:
 except locale.Error:
     print("Spanish locale 'es_ES' not installed. Using default locale.")
 
-# Load bounding box configurations from JSON file - change this to the correct file for the round
-with open('templates/r2/bounding_boxes.json', 'r') as f:   
+# Update paths to use project root
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+bounding_boxes_path = os.path.join(project_root, 'templates', 'r2', 'bounding_boxes.json')
+
+# Load bounding box configurations from JSON file
+with open(bounding_boxes_path, 'r') as f:   
     bounding_boxes = json.load(f)
 
 def get_bounding_box_coordinates(bbox_name, img_width, img_height):
@@ -397,19 +401,25 @@ def process_folder(input_folder, empty_template_paths, csv_output_path, debug=Fa
     print(f"All PDFs processed. Results saved to {csv_output_path}")
 
 if __name__ == "__main__":
-    data_directory = './data'  # Directory containing input folders
+    # Update paths to use project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    data_directory = os.path.join(project_root, 'data')
     
     empty_template_paths_r1 = {
-        "numobs1": './templates/r1/empty_numobs1.png',
-        "numobs2": './templates/r1/empty_numobs2.png',
-        "numobs3": './templates/r1/empty_numobs3.png'
+        "numobs1": os.path.join(project_root, 'templates/r1/empty_numobs1.png'),
+        "numobs2": os.path.join(project_root, 'templates/r1/empty_numobs2.png'),
+        "numobs3": os.path.join(project_root, 'templates/r1/empty_numobs3.png')
     }
     
     empty_template_paths_r2 = {
-        "numobs1": './templates/r2/empty_numobs1.png',
-        "numobs2": './templates/r2/empty_numobs2.png',
-        "numobs3": './templates/r2/empty_numobs3.png'
+        "numobs1": os.path.join(project_root, 'templates/r2/empty_numobs1.png'),
+        "numobs2": os.path.join(project_root, 'templates/r2/empty_numobs2.png'),
+        "numobs3": os.path.join(project_root, 'templates/r2/empty_numobs3.png')
     }
+
+    # Update output path
+    output_dir = os.path.join(project_root, 'data', 'output', 'csv')
+    os.makedirs(output_dir, exist_ok=True)
 
     # List all subdirectories in the data directory
     input_folders = [os.path.join(data_directory, name) for name in os.listdir(data_directory)
@@ -418,7 +428,6 @@ if __name__ == "__main__":
     # Process each input folder
     for input_folder in input_folders:
         input_folder_name = os.path.basename(input_folder)
-        csv_output_path = f'./output/csv/{input_folder_name}.csv'
+        csv_output_path = os.path.join(output_dir, f'{input_folder_name}.csv')
         print(f"Processing input folder: {input_folder}")
-        # Process with debug=True and first_pdf_only=True
         process_folder(input_folder, empty_template_paths_r2, csv_output_path, debug=True, first_pdf_only=True)

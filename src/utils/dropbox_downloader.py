@@ -51,16 +51,19 @@ def download_pdfs(dbx, shared_url, download_path):
         print("Full error details:", str(e))
 
 def main():
+    # Update config path
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'secret.json')
+    
     # Load credentials
-    with open('secret.json') as f:
+    with open(config_path) as f:
         secrets = json.load(f)
     
     # Initialize Dropbox client    
     dbx = dropbox.Dropbox(secrets['dropbox_access_token'])
     shared_url = secrets['dropbox_shared_url']
     
-    # Set download path
-    download_path = "data/downloaded_pdfs"
+    # Set download path relative to project root
+    download_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "downloaded_pdfs")
     
     # Download the PDFs
     download_pdfs(dbx, shared_url, download_path)
