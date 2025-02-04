@@ -3,12 +3,13 @@
 This project focuses on detecting and counting handwritten signatures from specific areas on standardized Peru ONPE election records. The PDFs contain multiple signature boxes on different pages, and the project applies various image processing techniques to accurately detect these signatures.
 
 ## Table of Contents
-- [Installation](#installation)
-- [Usage](#usage)
-- [Image Processing Techniques](#image-processing-techniques)
-- [File Structure](#file-structure)
-- [Contributing](#contributing)
-- [License](#license)
+1. [Project Structure](#project-structure)
+2. [Installation](#installation)
+3. [Usage](#usage)
+4. [Main Script (main.py) Explanation](#main-script-mainpy-explanation)
+5. [Image Processing Techniques](#image-processing-techniques)
+6. [Contributing](#contributing)
+7. [License](#license)
 
 ---
 
@@ -16,7 +17,7 @@ This project focuses on detecting and counting handwritten signatures from speci
 
 ```
 .
-├── src/                         # Source code
+├── src/                        # Source code
 │   ├── ocr/                    # OCR-related modules
 │   │   ├── __init__.py
 │   │   ├── template_generation.py
@@ -30,12 +31,12 @@ This project focuses on detecting and counting handwritten signatures from speci
 │   ├── downloaded_pdfs/       # Downloaded PDF files
 │   └── output/                # Processing results
 ├── templates/                 # Empty signature box templates
-│   └── r2/
-│       └── bounding_boxes.json
+│   └── r2/                    # Example template
+│       └── bounding_boxes.json 
 ├── main.py                    # Main entry point
 ├── setup.py                   # Package installation
 ├── requirements.txt           # Project dependencies
-└── README.md                 # Project documentation
+└── README.md                  # Project documentation
 ```
 
 ## Installation
@@ -122,7 +123,52 @@ To run the program:
 The key directories used by this project are:
 - `./data/downloaded_pdfs/` - For storing downloaded PDFs.
 - `./data/output/` - For storing processed results.
-- `./templates/r2/` - For storing bounding box templates.
+- `./templates/` - For storing bounding box templates.
+
+## Main Script (main.py) Explanation
+
+The `main.py` script serves as the entry point for the signature detection process. Here's how it works:
+
+### Configuration Loading
+- Loads secret configuration (Dropbox credentials) from `config/secret.json`
+- Initializes necessary directories:
+  - `data/downloaded_pdfs/`: For storing downloaded PDF files
+  - `data/output/`: For storing processing results
+
+### Process Flow
+1. **Dropbox Integration**
+   - Initializes Dropbox client using access token
+   - Downloads PDF files from specified shared folder
+
+2. **Document Processing**
+   - After downloading, processes each PDF document to:
+     - Extract table numbers
+     - Detect signatures in specified regions
+     - Count signatures in each region
+     - Generate output CSV with results
+
+### Usage Example
+
+```bash
+python main.py
+```
+
+This will:
+1. Download PDFs from Dropbox
+2. Process each PDF for signature detection
+3. Save results to the output directory
+
+### Required Configuration
+Before running, ensure you have:
+1. Created `config/secret.json` with:
+   ```json
+   {
+     "dropbox_access_token": "your_access_token",
+     "dropbox_shared_url": "your_shared_folder_url"
+   }
+   ```
+2. Set up the necessary directory structure
+3. Installed all required dependencies
 
 ---
 
