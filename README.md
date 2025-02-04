@@ -17,19 +17,20 @@ This project focuses on detecting and counting handwritten signatures from speci
 
 ```
 .
-├── src/                        # Source code
-│   ├── ocr/                    # OCR-related modules
-│   │   ├── __init__.py
-│   │   ├── template_generation.py
-│   │   └── ocr_signature_detection.py
-│   └── utils/                  # Utility modules
-│       ├── __init__.py
-│       └── dropbox_downloader.py
-├── config/                     # Configuration files
+├── config/                    # Configuration files
 │   └── secret.json            # API keys and credentials
 ├── data/                      # Input PDFs and output CSV files
 │   ├── downloaded_pdfs/       # Downloaded PDF files
 │   └── output/                # Processing results
+├── src/                       # Source code
+│   ├── ocr/                   # OCR-related modules
+│   │   ├── __init__.py
+│   │   ├── ocr_signature_detection.py
+│   │   ├── template_generation.py
+│   │   └── time_extraction.py
+│   └── utils/                 # Utility modules
+│       ├── __init__.py
+│       └── dropbox_downloader.py
 ├── templates/                 # Empty signature box templates
 │   └── r2/                    # Example template
 │       └── bounding_boxes.json 
