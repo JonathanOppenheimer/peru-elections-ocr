@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="signature-detection",  # You can change this name
+    name="signature-detection",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -19,8 +19,8 @@ setup(
         "torchvision>=0.20.0",
     ],
     python_requires=">=3.8",
-    author="Your Name",  # Add your name
-    author_email="your.email@example.com",  # Add your email
+    author="Jonathan Oppenheimer",
+    author_email="jonathanoppenheimer0@gmail.com",
     description="A tool for detecting signatures in documents",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

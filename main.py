@@ -1,8 +1,8 @@
-import os
-from src.utils.dropbox_downloader import download_pdfs
-from src.ocr.ocr_signature_detection import process_documents  # You'll need to import your main OCR function
 import dropbox
 import json
+import os
+
+from src.utils.dropbox_downloader import download_pdfs
 
 def main():
     # Load configuration
@@ -23,8 +23,7 @@ def main():
     download_pdfs(dbx, secrets['dropbox_shared_url'], download_path)
     
     # Process the documents
-    # Uncomment and modify based on your OCR function
-    # process_documents(download_path, output_path)
+    #TODO add main running OCR function 
 
 if __name__ == "__main__":
     main() 
