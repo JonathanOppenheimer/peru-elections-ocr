@@ -8,8 +8,12 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dropbox.exceptions import ApiError
 from dropbox.files import FileMetadata, SharedLink
+from ratelimit import limits, sleep_and_retry
 from typing import Set
 
+# Rate limit: 1000 calls per minute
+CALLS = 1000
+RATE_LIMIT_PERIOD = 60  # 1 minute in seconds
 
 def load_downloaded_files(download_path: str) -> Set[str]:
     """Load the set of already downloaded files"""
@@ -49,6 +53,37 @@ def download_with_retry(dbx, shared_url: str, entry_name: str, file_path: str, m
                 print(f"Final error: {e}")
                 return False
 
+@sleep_and_retry
+@limits(calls=CALLS, period=RATE_LIMIT_PERIOD)
+def list_folder_with_retry(dbx, shared_link, cursor=None, max_retries=3):
+    """List folder contents with retry logic"""
+    for attempt in range(max_retries):
+        try:
+            if cursor:
+                return dbx.files_list_folder_continue(cursor)
+            else:
+                return dbx.files_list_folder(path='', shared_link=shared_link)
+        except ApiError as e:
+            if e.error.is_rate_limited():
+                # If we hit the rate limit, wait for the time specified in the error
+                time.sleep(e.error.get_retry_after() or 60)
+                continue
+            elif attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"Listing attempt {attempt + 1} failed. Retrying in {wait_time} seconds...")
+                print(f"Error: {e}")
+                time.sleep(wait_time)
+            else:
+                raise
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"Listing attempt {attempt + 1} failed. Retrying in {wait_time} seconds...")
+                print(f"Error: {e}")
+                time.sleep(wait_time)
+            else:
+                raise
+
 def download_pdfs(dbx, shared_url: str, download_path: str, max_workers: int = 4, save_frequency: int = 50, batch_size: int = 1000):
     """Download PDF files from a flat shared folder with resume capability using parallel downloads"""
     try:
@@ -85,36 +120,48 @@ def download_pdfs(dbx, shared_url: str, download_path: str, max_workers: int = 4
 
         try:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                result = dbx.files_list_folder(path='', shared_link=shared_link)
-                
+                cursor = None
                 while True:
-                    # Filter PDF files from current batch
-                    batch_files = [
-                        entry for entry in result.entries 
-                        if isinstance(entry, FileMetadata) and 
-                        entry.name.lower().endswith('.pdf')
-                    ]
-                    total_pdfs += len(batch_files)
-                    
-                    # Process current batch with parallel downloads
-                    futures = [
-                        executor.submit(download_file, entry)
-                        for entry in batch_files
-                        if entry.name not in downloaded_files
-                    ]
-                    
-                    # Wait for current batch to complete
-                    for future in as_completed(futures):
-                        future.result()  # This ensures we catch any exceptions
-                    
-                    # Save progress after each batch
-                    save_downloaded_files(download_path, downloaded_files)
-                    
-                    if not result.has_more:
-                        break
+                    try:
+                        # Get batch with retry logic
+                        result = list_folder_with_retry(dbx, shared_link, cursor)
+                        cursor = result.cursor
                         
-                    print(f"\nProcessed {total_pdfs} files so far. Getting next batch...")
-                    result = dbx.files_list_folder_continue(result.cursor)
+                        # Filter PDF files from current batch
+                        batch_files = [
+                            entry for entry in result.entries 
+                            if isinstance(entry, FileMetadata) and 
+                            entry.name.lower().endswith('.pdf')
+                        ]
+                        total_pdfs += len(batch_files)
+                        
+                        if batch_files:
+                            # Process current batch with parallel downloads
+                            futures = [
+                                executor.submit(download_file, entry)
+                                for entry in batch_files
+                                if entry.name not in downloaded_files
+                            ]
+                            
+                            # Wait for current batch to complete
+                            for future in as_completed(futures):
+                                try:
+                                    future.result()  # This ensures we catch any exceptions
+                                except Exception as e:
+                                    print(f"Error processing file: {e}")
+                            
+                            # Save progress after each batch
+                            save_downloaded_files(download_path, downloaded_files)
+                        
+                        if not result.has_more:
+                            break
+                            
+                        print(f"\nProcessed {total_pdfs} files so far. Getting next batch...")
+                        
+                    except Exception as e:
+                        print(f"Error processing batch: {e}")
+                        print("Waiting 60 seconds before retrying...")
+                        time.sleep(60)  # Wait a minute before retrying the batch
                     
         except KeyboardInterrupt:
             print("\nDownload interrupted by user. Progress has been saved.")
