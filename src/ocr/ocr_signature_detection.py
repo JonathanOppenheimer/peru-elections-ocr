@@ -280,35 +280,6 @@ def extract_table_number(pdf_image, pdf_file_path):
     # If both OCR and file name methods fail, return '999999'
     return '999999'
 
-def extract_time_and_date(pdf_image, box_name):
-    """
-    Extract and parse time and date from the specified area in the PDF image.
-
-    Parameters:
-        pdf_image (PIL.Image.Image): The image of the PDF page.
-        box_name (str): The name of the bounding box area to analyze.
-
-    Returns:
-        dict: OCR results containing time and date information.
-    """
-    img_width, img_height = pdf_image.size
-
-    # Get bounding box coordinates
-    coordinates = get_bounding_box_coordinates(box_name, img_width, img_height)
-    left = coordinates["left"]
-    top = coordinates["top"]
-    right = coordinates["right"]
-    bottom = coordinates["bottom"]
-
-    # Access ROI coordinates if they exist
-    roi_coords = coordinates.get("roi")
-
-    cropped_image = pdf_image.crop((left, top, right, bottom))
-    cropped_image_np = np.array(cropped_image)
-
-    # Preprocess the image for better OCR accuracy
-    ocr_results = get_ocr_results(cropped_image_np, roi_coords)
-    return ocr_results
 
 def get_all_features(pdf_path, empty_template_paths):
     """
@@ -332,8 +303,7 @@ def get_all_features(pdf_path, empty_template_paths):
     numobs3_count = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3")
 
     # Analyze open and close times
-    # open_time = extract_time_and_date(pdf_images[0], "open_time")
-    # close_time = extract_time_and_date(pdf_images[0], "close_time")
+    # open_time, close_time = get_ocr_results(pdf_images[0])
 
     return table_number, numobs1_count, numobs2_count, numobs3_count#, open_time, close_time
 
