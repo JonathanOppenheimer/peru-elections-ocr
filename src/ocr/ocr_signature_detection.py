@@ -1,17 +1,21 @@
+# Standard library imports
 import json
-import cv2
 import locale
-import numpy as np
+import multiprocessing as mp
 import os
+import re
+
+# Third-party imports
+import cv2
+import numpy as np
+import pandas as pd
 import pdf2image
 import pytesseract
-import re
-import pandas as pd
-import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
+from skimage.metrics import structural_similarity as ssim
 from tqdm import tqdm
 
-from skimage.metrics import structural_similarity as ssim
+# Local imports
 from src.ocr.time_extraction import get_ocr_results
 
 # Set the locale to Spanish for proper date parsing
