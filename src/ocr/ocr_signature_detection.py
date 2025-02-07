@@ -7,6 +7,9 @@ import pdf2image
 import pytesseract
 import re
 import pandas as pd
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
 
 from skimage.metrics import structural_similarity as ssim
 from src.ocr.time_extraction import get_ocr_results
@@ -330,74 +333,101 @@ def get_all_features(pdf_path, empty_template_paths):
 
     return table_number, numobs1_count, numobs2_count, numobs3_count#, open_time, close_time
 
-def process_folder(input_folder, empty_template_paths, csv_output_path, debug=False, first_pdf_only=False):
+def process_single_pdf(args):
     """
-    Process PDFs in the input folder and save the results to a CSV file.
+    Process a single PDF file and return its results.
     
     Parameters:
-        input_folder (str): Path to the folder containing PDF files.
-        empty_template_paths (dict): Dictionary mapping box names to template image paths.
-        csv_output_path (str): Path to the output CSV file.
-        debug (bool): If True, saves debug images showing the bounding boxes.
-        first_pdf_only (bool): If True, only processes the first PDF file.
+        args (tuple): (pdf_path, empty_template_paths, debug)
+    
+    Returns:
+        tuple: (filename, results) or (filename, None) if error
     """
-    batch_results = []
-    processed_files = 0
-   
-    # Check if CSV file exists, if so, remove it to start fresh
-    if os.path.isfile(csv_output_path):
-        os.remove(csv_output_path)
-    else: # Create output directory if it doesn't exist
-        os.makedirs(os.path.dirname(csv_output_path), exist_ok=True)
+    pdf_path, empty_template_paths, debug = args
+    filename = os.path.basename(pdf_path)
+    
+    try:
+        # Convert PDF to images
+        pdf_images = pdf2image.convert_from_path(pdf_path, dpi=300)
+        
+        # Extract features
+        table_number = extract_table_number(pdf_images[0], pdf_path)
+        numobs1 = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1", debug)
+        numobs2 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2", debug)
+        numobs3 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3", debug)
+        
+        return filename, [table_number, numobs1, numobs2, numobs3]
+    except Exception as e:
+        print(f"Error processing {filename}: {e}")
+        return filename, None
+
+def process_folder(input_folder, empty_template_paths, csv_output_path, debug=False, first_pdf_only=False, batch_size=100):
+    """
+    Process PDFs in parallel with checkpointing.
+    """
+    # Create output directory if needed
+    os.makedirs(os.path.dirname(csv_output_path), exist_ok=True)
     
     # Get list of PDF files
     pdf_files = [f for f in os.listdir(input_folder) if f.endswith('.pdf')]
     if first_pdf_only and pdf_files:
         pdf_files = [pdf_files[0]]
     
-    total_files = len(pdf_files)
-
-    # Define column names consistently
+    # Load progress file if it exists
+    progress_file = csv_output_path + '.progress'
+    processed_files = set()
+    if os.path.exists(progress_file):
+        with open(progress_file, 'r') as f:
+            processed_files = set(f.read().splitlines())
+    
+    # Filter out already processed files
+    remaining_files = [f for f in pdf_files if f not in processed_files]
+    
+    # Prepare arguments for parallel processing
+    process_args = [
+        (os.path.join(input_folder, filename), empty_template_paths, debug)
+        for filename in remaining_files
+    ]
+    
     columns = ["acta_number", "numobs1", "numobs2", "numobs3"]
-
-    for filename in pdf_files:
-        pdf_path = os.path.join(input_folder, filename)
-        print(f"Processing {filename} ({processed_files + 1}/{total_files})...")
-        try:
-            # Convert PDF to images
-            pdf_images = pdf2image.convert_from_path(pdf_path, dpi=300, poppler_path="/opt/homebrew/Cellar/poppler/25.01.0/bin")
-            
-            # Extract table number
-            table_number = extract_table_number(pdf_images[0], pdf_path)
-            
-            # Analyze signature boxes with debug flag
-            numobs1 = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1", debug)
-            numobs2 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2", debug)
-            numobs3 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3", debug)
-
-            # Append the result to the batch_results list
-            batch_results.append([table_number, numobs1, numobs2, numobs3])
-            processed_files += 1
-
-            print(batch_results)
-            
-            # Write results immediately
-            df_batch = pd.DataFrame(batch_results, columns=columns)
-            mode = 'w' if processed_files == 1 else 'a'
-            header = processed_files == 1
-            df_batch.to_csv(csv_output_path, index=False, mode=mode, header=header)
+    
+    # Initialize CSV file if it doesn't exist
+    if not os.path.exists(csv_output_path):
+        pd.DataFrame(columns=columns).to_csv(csv_output_path, index=False)
+    
+    # Process in batches
+    with ProcessPoolExecutor(max_workers=mp.cpu_count()) as executor:
+        for i in range(0, len(process_args), batch_size):
+            batch_args = process_args[i:i + batch_size]
             batch_results = []
-
-        except Exception as e:
-            print(f"Error processing {filename}: {e}")
-            continue
-
-    # Only try to sort if we have processed files successfully
+            
+            # Process batch in parallel with progress bar
+            with tqdm(total=len(batch_args), desc=f"Processing batch {i//batch_size + 1}") as pbar:
+                for filename, results in executor.map(process_single_pdf, batch_args):
+                    if results is not None:
+                        batch_results.append(results)
+                    
+                    # Update progress file
+                    with open(progress_file, 'a') as f:
+                        f.write(f"{filename}\n")
+                    
+                    pbar.update(1)
+            
+            # Write batch results to CSV
+            if batch_results:
+                df_batch = pd.DataFrame(batch_results, columns=columns)
+                df_batch.to_csv(csv_output_path, mode='a', header=False, index=False)
+    
+    # Final sorting of the CSV file
     if os.path.exists(csv_output_path) and os.path.getsize(csv_output_path) > 0:
         df = pd.read_csv(csv_output_path)
         df.sort_values(by="acta_number", inplace=True)
         df.to_csv(csv_output_path, index=False)
-
+    
+    # Clean up progress file
+    if os.path.exists(progress_file):
+        os.remove(progress_file)
+    
     print(f"All PDFs processed. Results saved to {csv_output_path}")
 
 if __name__ == "__main__":
