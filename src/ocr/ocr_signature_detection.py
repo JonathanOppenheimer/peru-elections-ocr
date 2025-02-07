@@ -297,7 +297,6 @@ def get_all_features(pdf_path, empty_template_paths):
 
     # Analyze numobs1 (on page 1)
     numobs1_count = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1")
-    print(numobs1_count)
     # Analyze numobs2 and numobs3 (on page 2)
     numobs2_count = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2")
     numobs3_count = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3")
@@ -434,4 +433,4 @@ if __name__ == "__main__":
         input_folder_name = os.path.basename(input_folder)
         csv_output_path = os.path.join(output_dir, f'{input_folder_name}.csv')
         print(f"Processing input folder: {input_folder}")
-        process_folder(input_folder, empty_template_paths_r2, csv_output_path, debug=True, first_pdf_only=True)
+        process_folder(input_folder, empty_template_paths_r2, csv_output_path, debug=False, first_pdf_only=False)
