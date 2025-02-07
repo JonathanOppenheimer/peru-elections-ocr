@@ -225,49 +225,48 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug
 
 def extract_table_number(pdf_image, pdf_file_path):
     """
-    Extract the table number from the PDF image.
-    Fallbacks:
-        1. If OCR fails or the number is longer than 6 digits, use the PDF file name if it's a 6-digit number.
-        2. If the above fails, use '999999'.
+    Extract the table number from the PDF filename.
+    If the filename is not a 6-digit number, use '999999' as fallback.
     
     Parameters:
-        pdf_image (PIL.Image.Image): The image of the PDF page.
+        pdf_image (PIL.Image.Image): The image of the PDF page (not used, kept for interface consistency).
         pdf_file_path (str): The full file path of the PDF file.
     
     Returns:
         str: The extracted table number or fallback value.
     """
-    img_width, img_height = pdf_image.size
+    # # OCR Method (currently disabled)
+    # img_width, img_height = pdf_image.size
+    #
+    # # Get bounding box coordinates
+    # coordinates = get_bounding_box_coordinates('mesa_sufragio', img_width, img_height)
+    # left = coordinates["left"]
+    # top = coordinates["top"]
+    # right = coordinates["right"]
+    # bottom = coordinates["bottom"]
+    # 
+    # # Crop the image to the bounding box
+    # cropped_image = pdf_image.crop((left, top, right, bottom))
+    # cropped_image_np = np.array(cropped_image)
 
-    # Get bounding box coordinates
-    coordinates = get_bounding_box_coordinates('mesa_sufragio', img_width, img_height)
-    left = coordinates["left"]
-    top = coordinates["top"]
-    right = coordinates["right"]
-    bottom = coordinates["bottom"]
+    # # Convert to grayscale
+    # gray = cv2.cvtColor(cropped_image_np, cv2.COLOR_RGB2GRAY)
 
-    # Crop the image to the bounding box
-    cropped_image = pdf_image.crop((left, top, right, bottom))
-    cropped_image_np = np.array(cropped_image)
+    # # Apply binary inverse thresholding
+    # _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
 
-    # Convert to grayscale
-    gray = cv2.cvtColor(cropped_image_np, cv2.COLOR_RGB2GRAY)
+    # # Configure pytesseract to recognize digits only
+    # custom_config = r'--oem 3 --psm 6 digits'
 
-    # Apply binary inverse thresholding
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
-
-    # Configure pytesseract to recognize digits only
-    custom_config = r'--oem 3 --psm 6 digits'
-
-    # Perform OCR
-    text = pytesseract.image_to_string(thresh, config=custom_config)
+    # # Perform OCR
+    # text = pytesseract.image_to_string(thresh, config=custom_config)
     
-    # Extract digits from the OCR result
-    ocr_number = ''.join(filter(str.isdigit, text)).strip()
+    # # Extract digits from the OCR result
+    # ocr_number = ''.join(filter(str.isdigit, text)).strip()
 
-    # Check if OCR extracted a valid number (6 digits or fewer)
-    if ocr_number and len(ocr_number) <= 6:
-        return ocr_number
+    # # Check if OCR extracted a valid number (6 digits or fewer)
+    # if ocr_number and len(ocr_number) <= 6:
+    #     return ocr_number
 
     # If OCR number is longer than 6 digits or empty, attempt to use the file name
     base_name = os.path.basename(pdf_file_path)          # e.g., '324.pdf' from '/path/to/324.pdf'
