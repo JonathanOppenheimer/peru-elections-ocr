@@ -11,7 +11,7 @@ def main():
         secrets = json.load(f)
     
     # Initialize paths
-    download_path = os.path.join('data', 'downloaded_pdfs')
+    download_path = os.path.join('data', 'input', 'downloaded_pdfs')
     output_path = os.path.join('data', 'output')
     
     # Ensure directories exist

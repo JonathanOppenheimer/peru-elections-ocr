@@ -37,7 +37,6 @@ config/secret.json
 # Ignore data folder and outputs
 data/
 debug/
-output/
 signature_counts.csv
 
 # Ignore Jupyter Notebook checkpoints

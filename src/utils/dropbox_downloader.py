@@ -191,7 +191,8 @@ def main():
     shared_url = secrets['dropbox_shared_url']
     
     # Set download path relative to project root
-    download_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "downloaded_pdfs")
+    download_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+                                "data", "input", "downloaded_pdfs")
     
     # Download the PDFs with 4 parallel workers
     download_pdfs(dbx, shared_url, download_path, max_workers=4)

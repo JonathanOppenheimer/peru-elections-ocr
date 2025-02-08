@@ -423,9 +423,10 @@ if __name__ == "__main__":
     output_dir = os.path.join(project_root, 'data', 'output', 'csv')
     os.makedirs(output_dir, exist_ok=True)
 
-    # List all subdirectories in the data directory
-    input_folders = [os.path.join(data_directory, name) for name in os.listdir(data_directory)
-                     if os.path.isdir(os.path.join(data_directory, name))]
+    # List all subdirectories in the input directory
+    input_directory = os.path.join(data_directory, 'input')
+    input_folders = [os.path.join(input_directory, name) for name in os.listdir(input_directory)
+                     if os.path.isdir(os.path.join(input_directory, name))]
 
     # Process each input folder
     for input_folder in input_folders:
