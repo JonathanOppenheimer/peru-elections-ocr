@@ -37,10 +37,10 @@ def find_unmatched_files(csv_path, folder_path):
 
 def main():
     # Define the path to the CSV file and the folder containing the files.
-    csv_file = "path/to/yourfile.csv"   # Replace with the path to your CSV file
-    folder = "path/to/your/folder"        # Replace with the path to your folder
+    csv_file = "./data/output/csv/Actas2018rd2.csv"   # Replace with the path to your CSV file
+    folder = "./data/Actas2018rd2"        # Replace with the path to your folder
     # Define the output file path.
-    output_file = "/data/output/dif"
+    output_file = "./data/output/dif"
 
     # Get the list of unmatched files.
     missing_files = find_unmatched_files(csv_file, folder)
