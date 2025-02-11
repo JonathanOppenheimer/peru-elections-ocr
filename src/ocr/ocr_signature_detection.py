@@ -339,6 +339,9 @@ def extract_document_type(pdf_image, bounding_boxes):
         
         # Clean and normalize the text
         cleaned_text = ' '.join(text.strip().split())
+        # Trim non-letter characters from start and end
+        cleaned_text = re.sub(r'^[^a-zA-Z]+', '', cleaned_text)  # Remove non-letters from start
+        cleaned_text = re.sub(r'[^a-zA-Z]+$', '', cleaned_text)  # Remove non-letters from end
         return cleaned_text if cleaned_text else None
         
     except (ValueError, KeyError) as e:
