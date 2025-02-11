@@ -437,19 +437,15 @@ def process_folder(input_folder, empty_template_paths, csv_output_path, bounding
             
             # Process batch in parallel with progress bar
             with tqdm(total=len(batch_args), desc=f"Processing batch {i//batch_size + 1}") as pbar:
-                for args in batch_args:
-                    filename = os.path.basename(args[0])  # Extract filename from full path
-                    try:
-                        _, results = process_single_pdf(args)
-                        if results is not None:
-                            batch_results.append(results)
-                            # Update progress file immediately after successful processing
-                            with open(progress_file, 'a') as f:
-                                f.write(f"{filename}\n")
-                    except Exception as e:
-                        print(f"Error processing {filename}: {e}")
-                    finally:
-                        pbar.update(1)
+                for filename, results in executor.map(process_single_pdf, batch_args):
+                    if results is not None:
+                        batch_results.append(results)
+                    
+                    # Update progress file
+                    with open(progress_file, 'a') as f:
+                        f.write(f"{filename}\n")
+                    
+                    pbar.update(1)
             
             # Write batch results to CSV
             if batch_results:
