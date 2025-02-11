@@ -98,7 +98,8 @@ def generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir="./templ
     box_pages = {
         "numobs1": 0,  # First page
         "numobs2": 1,  # Second page
-        "numobs3": 1   # Second page
+        "numobs3": 1,  # Second page
+        "document_type": 0  # First page
     }
     
     for box_name, page_num in box_pages.items():
@@ -106,19 +107,32 @@ def generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir="./templ
             # Extract the full signature area
             box_image = extract_box_from_pdf(empty_pdf_path, box_name, bounding_boxes, page_num)
             
-            # Get grid configuration
-            grid_config = bounding_boxes[box_name]["grid"]
-            rows = grid_config["rows"]
-            cols = grid_config["columns"]
+            # Save the full signature area
+            full_area_processed = preprocess_image_for_consistent_background(box_image)
+            full_area_output_path = f"{output_dir}/full_area_{box_name}.png"
+            Image.fromarray(full_area_processed).save(full_area_output_path)
+            print(f"Generated full area template for {box_name} at {full_area_output_path}")
             
-            # Split into individual signature boxes
-            signature_boxes = split_image_into_grid(box_image, rows, cols)
-            
-            # Process and save just the first box as template
-            processed_template = preprocess_image_for_consistent_background(signature_boxes[0])
-            output_path = f"{output_dir}/empty_{box_name}.png"
-            Image.fromarray(processed_template).save(output_path)
-            print(f"Generated template for {box_name} at {output_path}")
+            # Only process grid for signature boxes (not document_type)
+            if box_name != "document_type":
+                # Get grid configuration
+                grid_config = bounding_boxes[box_name]["grid"]
+                rows = grid_config["rows"]
+                cols = grid_config["columns"]
+                
+                # Split into individual signature boxes
+                signature_boxes = split_image_into_grid(box_image, rows, cols)
+                
+                # Process and save just the first box as template
+                processed_template = preprocess_image_for_consistent_background(signature_boxes[0])
+                output_path = f"{output_dir}/empty_{box_name}.png"
+                Image.fromarray(processed_template).save(output_path)
+                print(f"Generated template for {box_name} at {output_path}")
+            else:
+                # For document_type, save the full area as is
+                output_path = f"{output_dir}/empty_{box_name}.png"
+                Image.fromarray(full_area_processed).save(output_path)
+                print(f"Generated template for {box_name} at {output_path}")
             
         except Exception as e:
             print(f"Error generating template for {box_name}: {str(e)}")
@@ -128,9 +142,9 @@ if __name__ == "__main__":
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     
     # Configuration paths
-    empty_pdf_path = os.path.join(project_root, "data", "testing", "000001.pdf")
-    bounding_boxes_path = os.path.join(project_root, "templates", "r2", "bounding_boxes.json")
-    output_dir = os.path.join(project_root, "templates", "r2")
+    empty_pdf_path = os.path.join(project_root, "data", "input", "testing", "ACERMC3709107311512.PDF")
+    bounding_boxes_path = os.path.join(project_root, "templates", "erm", "bounding_boxes.json")
+    output_dir = os.path.join(project_root, "templates", "erm")
     
     # Load bounding box configurations
     with open(bounding_boxes_path, 'r') as f:
