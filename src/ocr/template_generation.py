@@ -181,21 +181,13 @@ if __name__ == "__main__":
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     
     # Configuration paths
+    empty_pdf_path = os.path.join(project_root, "data", "input", "testing", "ACERMC3709307844823.PDF")
     bounding_boxes_path = os.path.join(project_root, "templates", "erm", "bounding_boxes.json")
+    output_dir = os.path.join(project_root, "templates", "test")
     
     # Load bounding box configurations
     with open(bounding_boxes_path, 'r') as f:
         bounding_boxes = json.load(f)
     
-    # Define empty PDFs for each type
-    type_pdfs = {
-        "REGIONAL": os.path.join(project_root, "data", "input", "testing", "ACERMC3709207405405.PDF"),  # A REGIONAL form
-        "MUNICIPAL PROVINCIAL": os.path.join(project_root, "data", "input", "testing", "ACERMC3709307844823.PDF")  # A MUNICIPAL PROVINCIAL form
-    }
-    
-    # Generate templates for each type
-    for doc_type, pdf_path in type_pdfs.items():
-        output_dir = os.path.join(project_root, "templates", doc_type.lower().replace(" ", "_"))
-        print(f"\nGenerating templates for {doc_type} using {pdf_path}")
-        print(f"Output directory: {output_dir}")
-        generate_empty_templates(pdf_path, bounding_boxes, output_dir)
+    # Generate all templates
+    generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir)

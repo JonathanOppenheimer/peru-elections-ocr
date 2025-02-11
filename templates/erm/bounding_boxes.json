@@ -7,9 +7,9 @@
             "bottom_pct": 0.165
         },
         "document_type": {
-            "left_pct": 0.25,
+            "left_pct": 0.03,
             "top_pct": 0.085,
-            "right_pct": 0.75,
+            "right_pct": 0.97,
             "bottom_pct": 0.12
         },
         "numobs1": {
