@@ -1,15 +1,16 @@
 # OCR Signature Detection Project
 
-This project focuses on detecting and counting handwritten signatures from specific areas on standardized Peru ONPE election records. The PDFs contain multiple signature boxes on different pages, and the project applies various image processing techniques to accurately detect these signatures.
+This project focuses on detecting and counting handwritten signatures from specific areas on standardized Peru ONPE election records (Actas). The system processes PDF documents containing multiple signature boxes across different pages, using advanced image processing and OCR techniques to accurately detect signatures and extract relevant metadata such as table numbers and document types.
 
 ## Table of Contents
 1. [Project Structure](#project-structure)
 2. [Installation](#installation)
 3. [Usage](#usage)
-4. [Main Script (main.py) Explanation](#main-script-mainpy-explanation)
-5. [Image Processing Techniques](#image-processing-techniques)
-6. [Contributing](#contributing)
-7. [License](#license)
+4. [Configuration](#configuration)
+5. [Template System](#template-system)
+6. [Image Processing Techniques](#image-processing-techniques)
+7. [Contributing](#contributing)
+8. [License](#license)
 
 ---
 
@@ -19,25 +20,31 @@ This project focuses on detecting and counting handwritten signatures from speci
 .
 ├── config/                    # Configuration files
 │   └── secret.json            # API keys and credentials
-├── data/                      # Input PDFs and output CSV files
-│   ├── downloaded_pdfs/       # Downloaded PDF files
-│   └── output/                # Processing results
-├── src/                       # Source code
-│   ├── ocr/                   # OCR-related modules
+├── data/                     # Data directory
+│   ├── input/               # Input PDFs for processing
+│   │   └── testing/        # Test PDF files
+│   ├── downloaded_pdfs/     # PDFs downloaded from Dropbox
+│   └── output/              # Processing results
+│       └── csv/            # CSV output files
+├── src/                      # Source code
+│   ├── ocr/                 # OCR-related modules
 │   │   ├── __init__.py
-│   │   ├── ocr_signature_detection.py
-│   │   ├── template_generation.py
-│   │   └── time_extraction.py
-│   └── utils/                 # Utility modules
+│   │   ├── ocr_signature_detection.py  # Main signature detection logic
+│   │   ├── template_generation.py      # Template generation utilities
+│   │   └── time_extraction.py          # Time extraction functionality
+│   └── utils/               # Utility modules
 │       ├── __init__.py
-│       └── dropbox_downloader.py
-├── templates/                 # Empty signature box templates
-│   └── r2/                    # Example template
-│       └── bounding_boxes.json 
-├── main.py                    # Main entry point
-├── setup.py                   # Package installation
-├── requirements.txt           # Project dependencies
-└── README.md                  # Project documentation
+│       └── dropbox_downloader.py  # Dropbox integration
+├── templates/                # Template files
+│   └── erm/                 # ERM template directory
+│       ├── bounding_boxes.json     # Box coordinates
+│       ├── empty_numobs1.png       # Empty signature templates
+│       ├── empty_numobs2.png
+│       └── empty_numobs3.png
+├── main.py                   # Main entry point
+├── setup.py                  # Package installation
+├── requirements.txt          # Project dependencies
+└── README.md                # Project documentation
 ```
 
 ## Installation
@@ -47,8 +54,8 @@ To set up this project locally, follow these steps:
 ### 1. Clone the Repository
 First, clone the repository to your local machine:
 ```bash
-git clone https://github.com/your-repo-url.git
-cd your-repo-url
+git clone https://github.com/JonathanOppenheimer/peru-elections-ocr
+cd peru-elections-ocr
 ```
 
 ### 2. Set Up a Virtual Environment (Optional but recommended)
@@ -110,66 +117,99 @@ python ocr_signature_detection.py
 
 ## Usage
 
-To run the program:
+### Basic Usage
 
-1. Add your Dropbox credentials to `config/secret.json`
-2. Run the main script:
+1. Configure your environment:
    ```bash
-   python main.py
-   ```
-
-3. The results, including the table number and the count of signatures from the different boxes (`numobs1`, `numobs2`, `numobs3`), will be saved to a CSV file in the `./data/output/` directory.
-
-### Directory Structure
-The key directories used by this project are:
-- `./data/downloaded_pdfs/` - For storing downloaded PDFs.
-- `./data/output/` - For storing processed results.
-- `./templates/` - For storing bounding box templates.
-
-## Main Script (main.py) Explanation
-
-The `main.py` script serves as the entry point for the signature detection process. Here's how it works:
-
-### Configuration Loading
-- Loads secret configuration (Dropbox credentials) from `config/secret.json`
-- Initializes necessary directories:
-  - `data/downloaded_pdfs/`: For storing downloaded PDF files
-  - `data/output/`: For storing processing results
-
-### Process Flow
-1. **Dropbox Integration**
-   - Initializes Dropbox client using access token
-   - Downloads PDF files from specified shared folder
-
-2. **Document Processing**
-   - After downloading, processes each PDF document to:
-     - Extract table numbers
-     - Detect signatures in specified regions
-     - Count signatures in each region
-     - Generate output CSV with results
-
-### Usage Example
-
-```bash
-python main.py
-```
-
-This will:
-1. Download PDFs from Dropbox
-2. Process each PDF for signature detection
-3. Save results to the output directory
-
-### Required Configuration
-Before running, ensure you have:
-1. Created `config/secret.json` with:
-   ```json
+   # Set up config/secret.json with your credentials
    {
      "dropbox_access_token": "your_access_token",
      "dropbox_shared_url": "your_shared_folder_url"
    }
    ```
-2. Set up the necessary directory structure
-3. Installed all required dependencies
+
+2. Run the main script:
+   ```bash
+   python main.py
+   ```
+
+3. For processing a specific folder of PDFs:
+   ```python
+   from src.ocr import process_folder
+   
+   process_folder(
+       input_folder="data/input/testing",
+       empty_template_paths={
+           "numobs1": "templates/erm/empty_numobs1.png",
+           "numobs2": "templates/erm/empty_numobs2.png",
+           "numobs3": "templates/erm/empty_numobs3.png"
+       },
+       csv_output_path="data/output/csv/results.csv",
+       bounding_boxes_path="templates/erm/bounding_boxes.json"
+   )
+   ```
+
+### Output Format
+
+The program generates a CSV file with the following columns:
+- `table_number`: Extracted table number from the document
+- `document_type`: Type of the document (extracted via OCR)
+- `numobs1`: Number of signatures detected in the first observation box
+- `numobs2`: Number of signatures detected in the second observation box
+- `numobs3`: Number of signatures detected in the third observation box
+
+
+## Configuration
+
+### Bounding Boxes Configuration
+
+The `bounding_boxes.json` file defines the regions of interest for signature detection and metadata extraction:
+
+```json
+{
+    "numobs1": {
+        "left_pct": 0.1,
+        "top_pct": 0.2,
+        "right_pct": 0.3,
+        "bottom_pct": 0.4,
+        "grid": {
+            "rows": 3,
+            "columns": 2
+        }
+    },
+    "mesa_sufragio": {
+        "left_pct": 0.5,
+        "top_pct": 0.1,
+        "right_pct": 0.7,
+        "bottom_pct": 0.15
+    }
+}
+```
+
+Each box is defined by:
+- Percentage-based coordinates (`left_pct`, `top_pct`, `right_pct`, `bottom_pct`)
+- Optional grid configuration for signature boxes
+- Optional ROI (Region of Interest) for specific areas within boxes
+
+## Template System
+
+The project uses a template-based approach for signature detection:
+
+### Template Generation
+
+Templates can be generated using the template generation utility:
+
+```bash
+python -m src.ocr.template_generation
+```
+
+This will:
+1. Process an empty form PDF
+2. Extract signature box regions
+3. Generate preprocessed templates for each box type
+4. Save templates in the specified output directory
+
+### Template Matching
 
 ---
 
@@ -193,9 +233,13 @@ For signature detection, we use the **SSIM** algorithm to compare each signature
 
 ## Contributing
 
-Contributions are welcome! If you have suggestions or find issues, feel free to open a pull request or issue on the repository.
+Contributions are welcome! Please follow these steps:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
----
+For major changes, please open an issue first to discuss the proposed changes.
 
 ## License
 
@@ -204,6 +248,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 ### Additional Notes
-- **Templates**: To improve signature detection, it's important to have accurate templates of the empty signature boxes for `numobs1`, `numobs2`, and `numobs3`. These templates can be manually selected using the post-processed images generated by the system.
-- **Performance Considerations**: If you notice any false positives or issues with the SSIM similarity score, try adjusting the SSIM threshold in the `template_match_signature_area` function.
+
+- **Template Quality**: The quality of signature detection heavily depends on the templates used. Ensure templates are generated from clean, empty forms.
+- **Performance Tuning**: Adjust the SSIM threshold in `template_match_signature_area()` if experiencing false positives/negatives.
+- **Batch Processing**: For large datasets, use the batch processing feature with appropriate batch sizes to optimize memory usage.
 

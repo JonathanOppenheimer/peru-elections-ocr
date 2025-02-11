@@ -50,7 +50,7 @@ def split_image_into_grid(image_np, rows, cols):
             boxes.append(box)
     return boxes
 
-def extract_box_from_pdf(pdf_path, bbox_name, bounding_boxes, page_num=0):
+def extract_box_from_pdf(pdf_path, bbox_name, bounding_boxes, page_num=0, document_type="default"):
     """
     Extract a specific box from a PDF using bounding box coordinates.
     
@@ -59,12 +59,23 @@ def extract_box_from_pdf(pdf_path, bbox_name, bounding_boxes, page_num=0):
         bbox_name (str): Name of the bounding box to extract
         bounding_boxes (dict): Dictionary of bounding box configurations
         page_num (int): Page number to extract from (0-based)
+        document_type (str): Type of document being processed. Defaults to "default".
     
     Returns:
         numpy.ndarray: Cropped image of the specified box
     """
-    if bbox_name not in bounding_boxes:
-        raise ValueError(f"Bounding box '{bbox_name}' not found")
+    # Check if document type exists in bounding boxes
+    if document_type not in bounding_boxes:
+        document_type = "default"
+    
+    # Check if the specific box exists in the document type
+    if bbox_name in bounding_boxes[document_type]:
+        bbox = bounding_boxes[document_type][bbox_name]
+    else:
+        # Fallback to default if the box is not defined for this document type
+        if bbox_name not in bounding_boxes["default"]:
+            raise ValueError(f"Bounding box '{bbox_name}' not found in default configuration.")
+        bbox = bounding_boxes["default"][bbox_name]
     
     # Convert PDF page to image
     images = pdf2image.convert_from_path(pdf_path, dpi=300)
@@ -75,7 +86,6 @@ def extract_box_from_pdf(pdf_path, bbox_name, bounding_boxes, page_num=0):
     img_width, img_height = page_image.size
     
     # Get bounding box coordinates
-    bbox = bounding_boxes[bbox_name]
     left = int(bbox["left_pct"] * img_width)
     top = int(bbox["top_pct"] * img_height)
     right = int(bbox["right_pct"] * img_width)
@@ -102,10 +112,35 @@ def generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir="./templ
         "document_type": 0  # First page
     }
     
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # First, detect the document type of the empty PDF
+    images = pdf2image.convert_from_path(empty_pdf_path, dpi=300)
+    document_type = "default"  # Start with default
+    
+    try:
+        # Extract document type box using default configuration
+        doc_type_box = extract_box_from_pdf(empty_pdf_path, "document_type", bounding_boxes, 0, "default")
+        # Convert to grayscale if needed
+        if len(doc_type_box.shape) == 3:
+            doc_type_box = cv2.cvtColor(doc_type_box, cv2.COLOR_RGB2GRAY)
+        # Apply thresholding
+        _, thresh = cv2.threshold(doc_type_box, 150, 255, cv2.THRESH_BINARY)
+        # Perform OCR
+        import pytesseract
+        text = pytesseract.image_to_string(thresh, config='--oem 3 --psm 6', lang='spa')
+        detected_type = ' '.join(text.strip().split())
+        if detected_type in bounding_boxes:
+            document_type = detected_type
+            print(f"Detected document type: {document_type}")
+    except Exception as e:
+        print(f"Warning: Could not detect document type, using default. Error: {str(e)}")
+    
     for box_name, page_num in box_pages.items():
         try:
-            # Extract the full signature area
-            box_image = extract_box_from_pdf(empty_pdf_path, box_name, bounding_boxes, page_num)
+            # Extract the full signature area using detected document type
+            box_image = extract_box_from_pdf(empty_pdf_path, box_name, bounding_boxes, page_num, document_type)
             
             # Save the full signature area
             full_area_processed = preprocess_image_for_consistent_background(box_image)
@@ -115,8 +150,12 @@ def generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir="./templ
             
             # Only process grid for signature boxes (not document_type)
             if box_name != "document_type":
-                # Get grid configuration
-                grid_config = bounding_boxes[box_name]["grid"]
+                # Get grid configuration from the same source as the bounding box
+                if document_type in bounding_boxes and box_name in bounding_boxes[document_type]:
+                    grid_config = bounding_boxes[document_type][box_name]["grid"]
+                else:
+                    grid_config = bounding_boxes["default"][box_name]["grid"]
+                
                 rows = grid_config["rows"]
                 cols = grid_config["columns"]
                 
@@ -142,13 +181,21 @@ if __name__ == "__main__":
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     
     # Configuration paths
-    empty_pdf_path = os.path.join(project_root, "data", "input", "testing", "ACERMC3709107311512.PDF")
     bounding_boxes_path = os.path.join(project_root, "templates", "erm", "bounding_boxes.json")
-    output_dir = os.path.join(project_root, "templates", "erm")
     
     # Load bounding box configurations
     with open(bounding_boxes_path, 'r') as f:
         bounding_boxes = json.load(f)
     
-    # Generate all templates
-    generate_empty_templates(empty_pdf_path, bounding_boxes, output_dir)
+    # Define empty PDFs for each type
+    type_pdfs = {
+        "REGIONAL": os.path.join(project_root, "data", "input", "testing", "ACERMC3709207405405.PDF"),  # A REGIONAL form
+        "MUNICIPAL PROVINCIAL": os.path.join(project_root, "data", "input", "testing", "ACERMC3709307844823.PDF")  # A MUNICIPAL PROVINCIAL form
+    }
+    
+    # Generate templates for each type
+    for doc_type, pdf_path in type_pdfs.items():
+        output_dir = os.path.join(project_root, "templates", doc_type.lower().replace(" ", "_"))
+        print(f"\nGenerating templates for {doc_type} using {pdf_path}")
+        print(f"Output directory: {output_dir}")
+        generate_empty_templates(pdf_path, bounding_boxes, output_dir)

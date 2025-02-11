@@ -24,7 +24,7 @@ try:
 except locale.Error:
     print("Spanish locale 'es_ES' not installed. Using default locale.")
 
-def get_bounding_box_coordinates(bbox_name, img_width, img_height, bounding_boxes):
+def get_bounding_box_coordinates(bbox_name, img_width, img_height, bounding_boxes, document_type="default"):
     """
     Retrieve bounding box coordinates and ROI for a given bounding box name.
     ROI coordinates are relative to the bounding box.
@@ -34,6 +34,7 @@ def get_bounding_box_coordinates(bbox_name, img_width, img_height, bounding_boxe
         img_width (int): The width of the image in pixels.
         img_height (int): The height of the image in pixels.
         bounding_boxes (dict): Dictionary containing bounding box configurations.
+        document_type (str): The type of document being processed. Defaults to "default".
 
     Returns:
         dict: A dictionary containing:
@@ -43,10 +44,18 @@ def get_bounding_box_coordinates(bbox_name, img_width, img_height, bounding_boxe
               - "bottom": Bottom coordinate of the bounding box (int).
               - "roi": Tuple (x, y, w, h) relative to the bounding box, or None if ROI is not defined.
     """
-    if bbox_name not in bounding_boxes:
-        raise ValueError(f"Bounding box '{bbox_name}' not found.")
+    # Check if document type exists in bounding boxes
+    if document_type not in bounding_boxes:
+        document_type = "default"
 
-    bbox = bounding_boxes[bbox_name]
+    # Check if the specific box exists in the document type
+    if bbox_name in bounding_boxes[document_type]:
+        bbox = bounding_boxes[document_type][bbox_name]
+    else:
+        # Fallback to default if the box is not defined for this document type
+        if bbox_name not in bounding_boxes["default"]:
+            raise ValueError(f"Bounding box '{bbox_name}' not found in default configuration.")
+        bbox = bounding_boxes["default"][bbox_name]
 
     # Calculate absolute bounding box pixel coordinates
     left = int(bbox["left_pct"] * img_width)
@@ -146,14 +155,22 @@ def template_match_signature_area(cropped_image_np, empty_template, threshold=0.
     """
     # Preprocess the signature region
     processed_image = preprocess_image_for_consistent_background(cropped_image_np)
-    processed_template = preprocess_image_for_consistent_background(empty_template)
+    processed_template = preprocess_image_for_consistent_background(empty_template)    
     resized_template = cv2.resize(processed_template, (processed_image.shape[1], processed_image.shape[0]))
+    
+    # # Show processed images for debugging
+    # cv2.imshow('Processed Image', processed_image)
+    # cv2.imshow('Processed Template', resized_template)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
 
     # Calculate SSIM
     score, _ = ssim(processed_image, resized_template, full=True)
+    # print(score < threshold)
     return score < threshold
 
-def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug=False, bounding_boxes=None):
+def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug=False, bounding_boxes=None, document_type="default"):
     """
     Analyze a signature box area and count the number of signed boxes.
     
@@ -163,6 +180,7 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug
         box_name (str): The name of the bounding box area to analyze.
         debug (bool): If True, saves debug images showing the bounding box.
         bounding_boxes (dict): Dictionary containing bounding box configurations.
+        document_type (str): The type of document being processed. Defaults to "default".
 
     Returns:
         int: The number of signed boxes in the area.
@@ -175,7 +193,7 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug
     img_width, img_height = pdf_image.size
 
     # Get bounding box coordinates
-    coordinates = get_bounding_box_coordinates(box_name, img_width, img_height, bounding_boxes)
+    coordinates = get_bounding_box_coordinates(box_name, img_width, img_height, bounding_boxes, document_type)
     left = coordinates["left"]
     top = coordinates["top"]
     right = coordinates["right"]
@@ -201,8 +219,12 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug
     cropped_image = pdf_image.crop((left, top, right, bottom))
     cropped_image_np = np.array(cropped_image)
 
-    # Get grid configuration from bounding boxes
-    grid_config = bounding_boxes[box_name]["grid"]
+    # Get grid configuration from the same source as the bounding box coordinates
+    if document_type in bounding_boxes and box_name in bounding_boxes[document_type]:
+        grid_config = bounding_boxes[document_type][box_name]["grid"]
+    else:
+        grid_config = bounding_boxes["default"][box_name]["grid"]
+
     rows = grid_config["rows"]
     cols = grid_config["columns"]
 
@@ -211,20 +233,23 @@ def analyze_single_signature_box(pdf_image, empty_template_path, box_name, debug
     
     # Perform signature analysis
     signature_count = 0
+    # print("--------------------------------")
     for box in signature_boxes:
         if template_match_signature_area(box, empty_template):
             signature_count += 1
 
     return signature_count
 
-def extract_table_number(pdf_image, pdf_file_path):
+def extract_table_number(pdf_image, pdf_file_path, bounding_boxes, document_type="default"):
     """
     Extract the table number from the PDF filename.
     If the filename is not a 6-digit number, use '999999' as fallback.
     
     Parameters:
-        pdf_image (PIL.Image.Image): The image of the PDF page (not used, kept for interface consistency).
+        pdf_image (PIL.Image.Image): The image of the PDF page.
         pdf_file_path (str): The full file path of the PDF file.
+        bounding_boxes (dict): Dictionary containing bounding box configurations.
+        document_type (str): The type of document being processed. Defaults to "default".
     
     Returns:
         str: The extracted table number or fallback value.
@@ -233,7 +258,7 @@ def extract_table_number(pdf_image, pdf_file_path):
     img_width, img_height = pdf_image.size
     
     # Get bounding box coordinates
-    coordinates = get_bounding_box_coordinates('mesa_sufragio', img_width, img_height, None)
+    coordinates = get_bounding_box_coordinates('mesa_sufragio', img_width, img_height, bounding_boxes, document_type)
     left = coordinates["left"]
     top = coordinates["top"]
     right = coordinates["right"]
@@ -273,15 +298,15 @@ def extract_table_number(pdf_image, pdf_file_path):
         if file_name.isdigit():
             return file_name
     
-    
     return file_name_without_ext
 
-def extract_document_type(pdf_image):
+def extract_document_type(pdf_image, bounding_boxes):
     """
     Extract the document type from the PDF image.
     
     Parameters:
         pdf_image (PIL.Image.Image): The image of the PDF page.
+        bounding_boxes (dict): Dictionary containing bounding box configurations.
     
     Returns:
         str: The extracted document type or None if not found/configured.
@@ -290,7 +315,7 @@ def extract_document_type(pdf_image):
     
     try:
         # Get bounding box coordinates
-        coordinates = get_bounding_box_coordinates('document_type', img_width, img_height, None)
+        coordinates = get_bounding_box_coordinates('document_type', img_width, img_height, bounding_boxes)
         left = coordinates["left"]
         top = coordinates["top"]
         right = coordinates["right"]
@@ -326,28 +351,29 @@ def process_single_pdf(args):
     Process a single PDF file and return its results.
     
     Parameters:
-        args (tuple): (pdf_path, empty_template_paths, debug)
+        args (tuple): (pdf_path, empty_template_paths, debug, bounding_boxes)
     
     Returns:
         tuple: (filename, results) or (filename, None) if error
     """
-    pdf_path, empty_template_paths, debug = args
-    filename = os.path.basename(pdf_path)
-    
     try:
+        # Correctly unpack all 4 arguments
+        pdf_path, empty_template_paths, debug, bounding_boxes = args
+        filename = os.path.basename(pdf_path)
+        
         # Convert PDF to images
         pdf_images = pdf2image.convert_from_path(pdf_path, dpi=300)
         
         # Extract features
-        table_number = extract_table_number(pdf_images[0], pdf_path)
-        document_type = extract_document_type(pdf_images[0])
-        numobs1 = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1", debug)
-        numobs2 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2", debug)
-        numobs3 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3", debug)
+        table_number = extract_table_number(pdf_images[0], pdf_path, bounding_boxes)
+        document_type = extract_document_type(pdf_images[0], bounding_boxes)
+        numobs1 = analyze_single_signature_box(pdf_images[0], empty_template_paths["numobs1"], "numobs1", debug, bounding_boxes, document_type)
+        numobs2 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs2"], "numobs2", debug, bounding_boxes, document_type)
+        numobs3 = analyze_single_signature_box(pdf_images[1], empty_template_paths["numobs3"], "numobs3", debug, bounding_boxes, document_type)
         
         return filename, [table_number, numobs1, numobs2, numobs3, document_type]
     except Exception as e:
-        print(f"Error processing {filename}: {e}")
+        print(f"Error processing {os.path.basename(pdf_path)}: {e}")
         return filename, None
 
 def process_folder(input_folder, empty_template_paths, csv_output_path, bounding_boxes_path, debug=False, first_pdf_only=False, batch_size=100):
@@ -355,15 +381,18 @@ def process_folder(input_folder, empty_template_paths, csv_output_path, bounding
     Process PDFs in parallel with checkpointing.
     """
     # Load bounding box configurations from JSON file
-    with open(bounding_boxes_path, 'r') as f:   
-        bounding_boxes = json.load(f)
+    try:
+        with open(bounding_boxes_path, 'r') as f:   
+            bounding_boxes = json.load(f)
+    except Exception as e:
+        print(f"Error loading bounding boxes from {bounding_boxes_path}: {e}")
+        return
 
     # Create output directory if needed
     os.makedirs(os.path.dirname(csv_output_path), exist_ok=True)
     
     # Get list of PDF files
     pdf_files = [f for f in os.listdir(input_folder) if f.lower().endswith(('.pdf', '.PDF'))]
-    print(f"Found {len(pdf_files)} PDF files in {input_folder}")
     
     if not pdf_files:
         print(f"No PDF files found in {input_folder}")
@@ -391,7 +420,7 @@ def process_folder(input_folder, empty_template_paths, csv_output_path, bounding
 
     # Prepare arguments for parallel processing
     process_args = [
-        (os.path.join(input_folder, filename), empty_template_paths, debug)
+        (os.path.join(input_folder, filename), empty_template_paths, debug, bounding_boxes)
         for filename in remaining_files
     ]
     
